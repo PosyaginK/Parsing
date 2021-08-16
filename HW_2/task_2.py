@@ -180,10 +180,10 @@ def main_parsing():
         print('error')
     return result
 
-df = main_parsing()
-print(df)
-print(df.loc[df['site'] == 'SuperJob'].head(5))
-print(df.loc[df['site'] == 'HeadHanter'].head(5))
-Сохраним в файл csv
-df.to_csv('13082021', index=False)
+# # df = main_parsing()
+# print(df)
+# print(df.loc[df['site'] == 'SuperJob'].head(5))
+# print(df.loc[df['site'] == 'HeadHanter'].head(5))
+# Сохраним в файл csv
+# df.to_csv('13082021', index=False)
 
