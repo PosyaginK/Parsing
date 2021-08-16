@@ -37,3 +37,5 @@ for item in collection.find({'site': 'SuperJob'}):
 #         print(item)
 #
 # get_salary(vacancy)
+
+# ВЗЯЛ ОТСРОЧКУ ДО 20.08.2021
