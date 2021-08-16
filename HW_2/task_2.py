@@ -186,4 +186,4 @@ def main_parsing():
 # print(df.loc[df['site'] == 'HeadHanter'].head(5))
 # Сохраним в файл csv
 # df.to_csv('13082021', index=False)
-
+# ВЗЯЛ отсрочку до 20.08.2021
