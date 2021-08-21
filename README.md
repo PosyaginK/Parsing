@@ -52,7 +52,7 @@
 
 # Lesson 5: **Scrapy**
 
-[Homework 5](https://github.com/PosyaginK/Parsing/tree/master/HW_5)
+[Homework 5](https://github.com/PosyaginK/Parsing/blob/master/HW_5/homework_5.ipynb)
 
 ## 1. Доработать паука в имеющемся проекте, чтобы он складывал все записи в БД (любую) и формировал item по структуре:
 
