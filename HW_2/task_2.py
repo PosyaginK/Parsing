@@ -1,9 +1,19 @@
-# Развернуть у себя на компьютере/виртуальной машине/хостинге MongoDB и реализовать функцию, записывающую собранные вакансии в созданную БД.
-# Библиотеки
-import requests as req
+"""
+Вариант 1
+
+Необходимо собрать информацию о вакансиях на вводимую должность (используем input или через аргументы получаем должность) с сайтов HH(обязательно) и/или Superjob(по желанию). Приложение должно анализировать несколько страниц сайта (также вводим через input или аргументы). Получившийся список должен содержать в себе минимум:
+
+Наименование вакансии.
+Предлагаемую зарплату (разносим в три поля: минимальная и максимальная и валюта. цифры преобразуем к цифрам).
+Ссылку на саму вакансию.
+Сайт, откуда собрана вакансия.
+
+По желанию можно добавить ещё параметры вакансии (например, работодателя и расположение). Структура должна быть одинаковая для вакансий с обоих сайтов. Общий результат можно вывести с помощью dataFrame через pandas. Сохраните в json либо csv.
+"""
+
+import requests
 from bs4 import BeautifulSoup as bs
 import pandas as pd
-from pymongo import MongoClient
 
 # Headers
 HEADERS = {
@@ -13,33 +23,43 @@ HEADERS = {
 
 # Получаем html страницы по url
 def get_html(url, params=''):
-    html = req.get(url, headers=HEADERS, params=params)
-    return html
+    response = requests.get(url, headers=HEADERS, params=params)
+    return response
 
 # HeadHanter
-URL = 'https://hh.ru/search/vacancy'
+URL_HH = 'https://hh.ru/search/vacancy'
+
+# SuperJob
+HOST_SJ = 'https://superjob.ru' # Нужен для получения полных ссылок на вакансии.
+URL_SJ = 'https://superjob.ru/vacancy/search/'
+
 
 # Получаем контент со страницы html
-def get_hh_content(html):
-    soup = bs(html, 'lxml')
+def get_hh_content(response):
+    soup = bs(response, 'lxml')
     items = soup.find_all('div', class_='vacancy-serp-item')
-    vacancy = []
+    hh_vacancy = []
 
     for item in items:
-        vacancy.append(
+        hh_vacancy.append(
             {
-                'site': 'HeadHanter', # Название сайта
-                'title': item.find('div', class_='vacancy-serp-item__info').get_text(), # Название вакансии
-                'link': item.find('div', class_='vacancy-serp-item__info').find('a').get('href'), # Ссылка на вакансию
-                'salary': item.find('div', class_='vacancy-serp-item__sidebar').get_text(), # Зарплата
-                'city': item.find('span', class_='vacancy-serp-item__meta-info').get_text(), # Город
-                'organization': item.find('div', class_='vacancy-serp-item__meta-info-company').get_text(), # Название компании
-                'note': item.find('div', class_='vacancy-label') # Примечание
+                'site': 'HeadHanter',  # Название сайта
+                'title': item.find('div', class_='vacancy-serp-item__info').get_text(),  # Название вакансии
+                'link': item.find('div', class_='vacancy-serp-item__info').find('a').get('href'),  # Ссылка на вакансию
+                'salary': item.find('div', class_='vacancy-serp-item__sidebar'),  # Зарплата
+                'city': item.find('span', class_='vacancy-serp-item__meta-info').get_text(),  # Город
+                'organization': item.find('div', class_='vacancy-serp-item__meta-info-company').get_text(),
+                # Название компании
+                'note': item.find('div', class_='vacancy-label')  # Примечание
             }
         )
     # Приведем данные к нормальному виду
-    for i in vacancy:
+    for i in hh_vacancy:
         # Salary
+        try:
+            i['salary'] = i['salary'].text
+        except:
+            i['salary'] = None
         if i['salary']:
             salary_list = i['salary'].split(' ')
             if salary_list[0] == 'от':
@@ -64,37 +84,16 @@ def get_hh_content(html):
         if i['city']:
             city_list = i['city'].split(',')
             i['city'] = city_list[0]
-    return vacancy
-
-# Главная функция
-def parser_hh():
-    POST = str(input('Введите название вакансии для парсинга: '))
-    PAGES = int(input('Количество страниц для парсинга: '))
-    html = get_html(URL)
-    if html.status_code == 200:
-        vacancy = []
-        for page in range(1, PAGES + 1):
-            print(f'Парсим страницу {page}')
-            html = get_html(URL, params={'text': POST, 'page': page})
-            vacancy.extend(get_hh_content(html.text))
-        result = pd.DataFrame(vacancy)
-    else:
-        print('error')
-    return result
+    return hh_vacancy
 
 
-# SuperJob
-HOST = 'https://superjob.ru' # Нужен для получения полных ссылок на вакансии.
-URL = 'https://superjob.ru/vacancy/search/'
-
-# Получаем контент со страницы html
 def superjob_get_content(html):
     soup = bs(html, 'lxml')
     items = soup.find_all('div', class_='f-test-vacancy-item')
 
-    vacancy = []
+    sj_vacancy = []
     for item in items:
-        vacancy.append(
+        sj_vacancy.append(
             {
                 'site': 'SuperJob',  # Название сайта
                 'title': item.find('a').get_text(),  # Название вакансии
@@ -107,9 +106,9 @@ def superjob_get_content(html):
             }
         )
     # Почистим данные
-    for v in vacancy:
+    for v in sj_vacancy:
         # link
-        v['link'] = HOST + v['link']
+        v['link'] = HOST_SJ + v['link']
         # salary
         if v['salary'] != 'По договорённости':
             salary_list = v['salary'].split('\xa0')
@@ -140,9 +139,25 @@ def superjob_get_content(html):
             v['city'] = city_split[2]
         else:
             v['city'] = city_split[3]
-    return vacancy
 
-# Главная функция
+    return sj_vacancy
+
+# Главные функции
+def parser_hh():
+    post = str(input('Введите название вакансии для парсинга: '))
+    pages = int(input('Количество страниц для парсинга: '))
+    html = get_html(URL)
+    if html.status_code == 200:
+        vacancy = []
+        for page in range(1, pages + 1):
+            print(f'Парсим страницу {page}')
+            html = get_html(URL, params={'text': post, 'page': page})
+            vacancy.extend(get_hh_content(html.text))
+        hh_result = pd.DataFrame(vacancy)
+    else:
+        hh_result = html.status_code
+    return hh_result
+
 def parser_sj():
     POST = str(input('Введите название вакансии для парсинга: '))
     PAGES = int(input('Количество страниц для парсинга: '))
@@ -153,36 +168,34 @@ def parser_sj():
             print(f'Парсим страницу {page}')
             html = get_html(URL, params={'keywords': POST, 'page': page})
             vacancy.extend(superjob_get_content(html))
-        result = pd.DataFrame(vacancy)
+        sj_result = pd.DataFrame(vacancy)
     else:
         print('error')
-    return result
+    return sj_result
 
 # ОБЪЕДИНИМ ПАРСИНГ ДВУХ САЙТОВ В ОДНУ ФУНКЦИЮ
 def main_parsing():
     HH_URL = 'https://hh.ru/search/vacancy'
     SJ_URL = 'https://superjob.ru/vacancy/search/'
 
-    POST = str(input('Введите название вакансии для парсинга: '))
-    PAGES = int(input('Количество страниц для парсинга: '))
+    post = str(input('Введите название вакансии для парсинга: '))
+    pages = int(input('Количество страниц для парсинга: '))
     HH_HTML = get_html(HH_URL)
     SJ_HTML = get_html(SJ_URL)
 
     if HH_HTML.status_code == 200 and SJ_HTML.status_code == 200:
         vacancy = []
-        for page in range(1, PAGES + 1):
+        for page in range(1, pages + 1):
             print(f'Парсятся страницы {page}')
-            hh = get_html(HH_URL, params={'text': POST, 'page': page})
-            sj = get_html(SJ_URL, params={'keywords': POST, 'page': page})
+            hh = get_html(HH_URL, params={'text': post, 'page': page})
+            sj = get_html(SJ_URL, params={'keywords': post, 'page': page})
             vacancy.extend(get_hh_content(hh.text) + superjob_get_content(sj.text))
         result = pd.DataFrame(vacancy)
     else:
         print('error')
     return result
 
-# # df = main_parsing()
-# print(df)
-# print(df.loc[df['site'] == 'SuperJob'].head(5))
-# print(df.loc[df['site'] == 'HeadHanter'].head(5))
-# Сохраним в файл csv
-# df.to_csv('13082021', index=False)
+df = main_parsing()
+print(df)
+
+df.to_csv('data.csv', sep=',', index=False, encoding='utf-8')
